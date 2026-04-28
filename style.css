@@ -118,7 +118,17 @@ main { flex: 1; max-width: 900px; width: 100%; margin: 0 auto; padding: 24px 20p
   content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
 }
 .group-card:hover { border-color: var(--green); transform: translateY(-1px); }
-.gc-name { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+.gc-delete {
+  position: absolute; top: 10px; right: 10px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  color: var(--muted); width: 28px; height: 28px;
+  border-radius: 6px; display: none; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s; z-index: 10;
+}
+.group-card:hover .gc-delete { display: flex; }
+.gc-delete:hover { color: var(--red); border-color: var(--red); background: rgba(224,92,92,.08); }
+
+.gc-name { font-size: 1rem; font-weight: 700; margin-bottom: 4px; padding-right: 24px; }
 .gc-meta { font-size: .78rem; color: var(--muted); margin-bottom: 12px; }
 .gc-balance {
   font-size: 1.1rem; font-weight: 700;

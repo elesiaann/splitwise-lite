@@ -74,12 +74,18 @@ function renderHome() {
     <div class="groups-home">
       <div class="home-header">
         <h1>Your Groups</h1>
-        <button class="btn-primary" id="homeCreate">+ New Group</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-secondary" id="homeExport">Export Data</button>
+          <button class="btn-secondary" id="homeImport">Import Data</button>
+          <button class="btn-primary" id="homeCreate">+ New Group</button>
+        </div>
       </div>
       <div class="group-grid" id="groupGrid"></div>
     </div>`;
 
   $('homeCreate').addEventListener('click', openCreateGroup);
+  $('homeExport').addEventListener('click', exportData);
+  $('homeImport').addEventListener('click', importData);
 
   const grid = $('groupGrid');
   groups.forEach(g => {
@@ -94,14 +100,29 @@ function renderHome() {
     card.style.cssText += `--before-bg:${memberColor(groups.indexOf(g))}`;
     card.innerHTML = `
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${memberColor(groups.indexOf(g))};border-radius:10px 10px 0 0"></div>
+      <button class="gc-delete" title="Delete Group" data-gid="${g.id}">🗑</button>
       <div class="gc-name">${esc(g.name)}</div>
       <div class="gc-meta">${g.members.length} members · ${expCount} expense${expCount!==1?'s':''}</div>
       <div class="gc-balance ${balClass}">${fmt(Math.abs(bal))}</div>
       <div class="gc-balance-label">${balLabel}</div>`;
-    card.addEventListener('click', () => openGroup(g.id));
+
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.gc-delete')) {
+        e.stopPropagation();
+        confirmAction('Delete Group', `Are you sure you want to delete "${g.name}"? This will remove all associated expenses and settlements.`, () => {
+          groups = groups.filter(x => x.id !== g.id);
+          expenses = expenses.filter(x => x.groupId !== g.id);
+          settlements = settlements.filter(x => x.groupId !== g.id);
+          save(); render();
+        });
+        return;
+      }
+      openGroup(g.id);
+    });
     grid.appendChild(card);
   });
 }
+
 
 // ══════════════════════════════════════════════════════════
 // GROUP VIEW
@@ -120,10 +141,12 @@ function renderGroupView() {
   $('logoArea').classList.add('hidden');
 
   $('headerActions').innerHTML = `
+    <button class="btn-secondary" id="hdrEdit">Edit Group</button>
     <button class="btn-secondary" id="hdrSettle">Settle Up</button>
     <button class="btn-primary"   id="hdrAddExp">+ Add Expense</button>`;
   $('hdrAddExp').addEventListener('click', openAddExpense);
   $('hdrSettle').addEventListener('click', openSettle);
+  $('hdrEdit').addEventListener('click', openEditGroup);
 
   const root = $('appRoot');
   root.innerHTML = `
@@ -371,14 +394,34 @@ function simplifyDebts(netBalances, members) {
 // ══════════════════════════════════════════════════════════
 // CREATE GROUP MODAL
 // ══════════════════════════════════════════════════════════
-let cgMembers = []; // temp list while modal is open
+let cgMode      = 'create'; // 'create' or 'edit'
+let cgMembers   = []; // temp list while modal is open
 
 function openCreateGroup() {
+  cgMode = 'create';
+  $('cgTitle').textContent = 'New Group';
+  $('cgSubmit').textContent = 'Create Group';
   cgMembers = [];
   $('cgName').value       = '';
   $('cgMemberName').value = '';
   $('cgError').classList.add('hidden');
   $('cgMemberList').innerHTML = '';
+  openModal('modalCreateGroup');
+  $('cgName').focus();
+}
+
+function openEditGroup() {
+  const g = groups.find(x => x.id === currentGroupId);
+  if (!g) return;
+
+  cgMode = 'edit';
+  $('cgTitle').textContent = 'Edit Group';
+  $('cgSubmit').textContent = 'Save Changes';
+  cgMembers = [...g.members];
+  $('cgName').value       = g.name;
+  $('cgMemberName').value = '';
+  $('cgError').classList.add('hidden');
+  renderCgChips();
   openModal('modalCreateGroup');
   $('cgName').focus();
 }
@@ -401,12 +444,22 @@ function cgAddMember() {
 
 function renderCgChips() {
   const el = $('cgMemberList');
-  el.innerHTML = cgMembers.map((m, i) => `
-    <div class="member-chip">
-      <div class="chip-avatar" style="background:${memberColor(i)};color:#0d1117">${memberInitial(m.name)}</div>
-      ${esc(m.name)}
-      <button class="chip-remove" data-mid="${m.id}">✕</button>
-    </div>`).join('');
+  el.innerHTML = cgMembers.map((m, i) => {
+    // If editing, don't allow removing members who already have expenses/settlements
+    let canRemove = true;
+    if (cgMode === 'edit') {
+      const hasExp = expenses.some(e => e.groupId === currentGroupId && (e.paidBy === m.id || e.splits[m.id]));
+      const hasSet = settlements.some(s => s.groupId === currentGroupId && (s.from === m.id || s.to === m.id));
+      if (hasExp || hasSet) canRemove = false;
+    }
+
+    return `
+      <div class="member-chip">
+        <div class="chip-avatar" style="background:${memberColor(i)};color:#0d1117">${memberInitial(m.name)}</div>
+        ${esc(m.name)}
+        ${canRemove ? `<button class="chip-remove" data-mid="${m.id}">✕</button>` : ''}
+      </div>`;
+  }).join('');
   el.querySelectorAll('.chip-remove').forEach(btn => {
     btn.addEventListener('click', () => {
       cgMembers = cgMembers.filter(m => m.id !== btn.dataset.mid);
@@ -420,7 +473,16 @@ $('cgSubmit').addEventListener('click', () => {
   if (!name) { showFieldError('cgError','Enter a group name.'); return; }
   if (cgMembers.length < 2) { showFieldError('cgError','Add at least 2 members.'); return; }
 
-  groups.push({ id: uid(), name, members: cgMembers, createdAt: Date.now() });
+  if (cgMode === 'create') {
+    groups.push({ id: uid(), name, members: cgMembers, createdAt: Date.now() });
+  } else {
+    const g = groups.find(x => x.id === currentGroupId);
+    if (g) {
+      g.name = name;
+      g.members = cgMembers;
+    }
+  }
+
   save();
   closeModal('modalCreateGroup');
   render();
@@ -729,6 +791,54 @@ function loadSampleData() {
     { [alice.id]:30, [bob.id]:30, [carol.id]:30 }, 'food', 3);
 
   save();
+}
+
+// ── Export / Import ──────────────────────────────────────
+function exportData() {
+  const data = {
+    groups,
+    expenses,
+    settlements,
+    version: '1.0',
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `splitwise-lite-export-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.groups || !data.expenses || !data.settlements) {
+          alert('Invalid data format.'); return;
+        }
+        if (confirm('This will overwrite all current data. Continue?')) {
+          groups = data.groups;
+          expenses = data.expenses;
+          settlements = data.settlements;
+          save();
+          render();
+        }
+      } catch (err) {
+        alert('Error parsing JSON.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 // ── Boot ──────────────────────────────────────────────────
