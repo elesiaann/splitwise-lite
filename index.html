@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Splitwise Lite — Shared Expense Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <header>
+    <div class="header-inner">
+      <button class="back-btn hidden" id="backBtn">← Groups</button>
+      <div class="logo" id="logoArea">
+        <span class="logo-icon">💸</span>
+        <span class="logo-text">Splitwise Lite</span>
+      </div>
+      <div class="header-actions" id="headerActions"></div>
+    </div>
+  </header>
+
+  <!-- ═══════════ MAIN ═══════════ -->
+  <main id="appRoot">
+    <!-- Rendered by JS -->
+  </main>
+
+  <!-- ═══════════ MODALS ═══════════ -->
+
+  <!-- Create Group -->
+  <div class="modal-backdrop hidden" id="modalCreateGroup">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>New Group</h2>
+        <button class="modal-close" data-close="modalCreateGroup">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label">Group Name</label>
+        <input id="cgName" class="field-input" type="text" placeholder="e.g. Trip to Vegas" maxlength="60" />
+
+        <label class="field-label">Members <span class="muted">(add at least 2)</span></label>
+        <div id="cgMemberList" class="member-chips"></div>
+        <div class="member-add-row">
+          <input id="cgMemberName" class="field-input" type="text" placeholder="Member name" maxlength="30" />
+          <button class="btn-icon-add" id="cgAddMember">+</button>
+        </div>
+        <p class="field-error hidden" id="cgError"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-close="modalCreateGroup">Cancel</button>
+        <button class="btn-primary" id="cgSubmit">Create Group</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Expense -->
+  <div class="modal-backdrop hidden" id="modalAddExpense">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2>Add Expense</h2>
+        <button class="modal-close" data-close="modalAddExpense">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-col">
+            <label class="field-label">Description</label>
+            <input id="aeDesc" class="field-input" type="text" placeholder="e.g. Dinner at Mario's" maxlength="80" />
+          </div>
+          <div class="form-col sm">
+            <label class="field-label">Amount ($)</label>
+            <input id="aeAmount" class="field-input" type="number" min="0.01" step="0.01" placeholder="0.00" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-col">
+            <label class="field-label">Paid by</label>
+            <select id="aePaidBy" class="field-select"></select>
+          </div>
+          <div class="form-col">
+            <label class="field-label">Category</label>
+            <select id="aeCategory" class="field-select">
+              <option value="general">📦 General</option>
+              <option value="food">🍕 Food &amp; Drink</option>
+              <option value="transport">🚗 Transport</option>
+              <option value="housing">🏠 Housing</option>
+              <option value="entertainment">🎬 Entertainment</option>
+              <option value="shopping">🛍 Shopping</option>
+              <option value="utilities">💡 Utilities</option>
+              <option value="travel">✈️ Travel</option>
+              <option value="other">💼 Other</option>
+            </select>
+          </div>
+          <div class="form-col sm">
+            <label class="field-label">Date</label>
+            <input id="aeDate" class="field-input" type="date" />
+          </div>
+        </div>
+
+        <label class="field-label">Split between</label>
+        <div class="split-type-row">
+          <button class="split-type-btn active" data-split="equal">Equally</button>
+          <button class="split-type-btn" data-split="exact">Exact Amounts</button>
+          <button class="split-type-btn" data-split="percent">Percentages</button>
+        </div>
+
+        <div id="aeSplitArea"></div>
+        <p class="split-remaining hidden" id="aeRemaining"></p>
+        <p class="field-error hidden" id="aeError"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-close="modalAddExpense">Cancel</button>
+        <button class="btn-primary" id="aeSubmit">Add Expense</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settle Up -->
+  <div class="modal-backdrop hidden" id="modalSettle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Settle Up</h2>
+        <button class="modal-close" data-close="modalSettle">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-col">
+            <label class="field-label">From</label>
+            <select id="suFrom" class="field-select"></select>
+          </div>
+          <div class="form-col">
+            <label class="field-label">To</label>
+            <select id="suTo" class="field-select"></select>
+          </div>
+        </div>
+        <label class="field-label">Amount ($)</label>
+        <input id="suAmount" class="field-input" type="number" min="0.01" step="0.01" placeholder="0.00" />
+        <label class="field-label">Date</label>
+        <input id="suDate" class="field-input" type="date" />
+        <p class="field-error hidden" id="suError"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-close="modalSettle">Cancel</button>
+        <button class="btn-primary" id="suSubmit">Record Settlement</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete -->
+  <div class="modal-backdrop hidden" id="modalConfirm">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 id="confirmTitle">Confirm</h2>
+        <button class="modal-close" data-close="modalConfirm">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMsg"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-close="modalConfirm">Cancel</button>
+        <button class="btn-danger" id="confirmOk">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Splitwise Lite — all data stored locally in your browser · nothing is sent to any server</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
